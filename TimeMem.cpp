@@ -6,11 +6,17 @@
 #include <stdio.h>
 #include <tchar.h>
 
+#include <string>
+#include <vector>
+
 // Alternative to ULARGE_INTEGER, this will give a proper FILETIME type
 union FILETIME64 {
     FILETIME legacy;
     uint64_t time;
 };
+
+// Automatic string for UNICODE and _UNICODE
+using auto_string = std::basic_string<_TCHAR>;
 
 namespace {
 // Displays usage help for this program.
@@ -68,62 +74,25 @@ int info(HANDLE hProcess) {
 // - build under 64-bit
 // - display detailed error message
 
-int _tmain(
-#ifdef _DEBUG
-    int argc, _TCHAR* argv[]
-#endif
-) {
-    LPTSTR szCmdLine;
-    LPTSTR szBegin;
+int _tmain(int argc, _TCHAR* argv[]) {
     STARTUPINFO si = { sizeof(STARTUPINFO) };
     PROCESS_INFORMATION pi;
-    int ret;
 
-    // Read the command line.
-    szCmdLine = GetCommandLine();
-
-    // Strip the first token from the command line.
-    if (szCmdLine[0] == '"') {
-        // The first token is double-quoted. Note that we don't need to
-        // worry about escaped quote, because a quote is not a valid
-        // path name under Windows.
-        LPTSTR p = szCmdLine + 1;
-        while (*p && *p != '"')
-            ++p;
-        szBegin = (*p == '"')? p + 1 : p;
-    }
-    else
-    {
-        // The first token is deliminated by a space or tab.
-        // See "Parsing C++ Command Line Arguments" below:
-        // http://msdn.microsoft.com/en-us/library/windows/desktop/17w5ykft(v=vs.85).aspx
-        LPTSTR p = szCmdLine;
-        while (*p && *p != ' ' && *p != '\t')
-            ++p;
-        szBegin = p;
-    }
-
-    // Skip white spaces.
-    while (*szBegin == ' ' || *szBegin == '\t')
-        ++szBegin;
-
-    // If we have no more arguments, display usage info and exit.
-    if (*szBegin == 0)
+    // If we have no arguments, display usage info and exit.
+    if (argc == 1)
     {
         usage();
-        return 1;
+        return EPERM;
     }
 
-    // Display argc,argv and command line for debugging purpose.
-#ifdef _DEBUG
-    {
-        int i;
-        for (i = 0; i < argc; i++)
-            _tprintf(_T("argv[%d]=%s\n"), i, argv[i]);
-        _tprintf(_T("CmdLine=%s\n"), szCmdLine);
-        _tprintf(_T("Invoked=%s\n"), szBegin);
+    // Read the command line.
+    auto szCmdLine = GetCommandLine();
+
+    // Get first argument, argument 0 is always the current program so skip it.
+    auto szBegin = _tcsstr(szCmdLine, argv[1]);
+    if (*(szBegin - 1) == _T('\"')) {
+        --szBegin;
     }
-#endif
 
     // Create the process.
     if (!CreateProcess(NULL, szBegin, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
@@ -140,7 +109,7 @@ int _tmain(
     }
 
     // Display process statistics.
-    ret = info(pi.hProcess);
+    int ret = info(pi.hProcess);
 
     // Close process handles.
     CloseHandle(pi.hThread);
