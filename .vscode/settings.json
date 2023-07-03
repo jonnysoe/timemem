@@ -1,0 +1,11 @@
+{
+    "editor.detectIndentation": false,
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.rulers": [72,120],
+    "files.trimTrailingWhitespace": true,
+    "git.rebaseWhenSync": true,
+    "git.pruneOnFetch": true,
+    "cmake.preferredGenerators": ["Ninja"],
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+}
