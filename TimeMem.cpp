@@ -2,8 +2,15 @@
 
 #include <Windows.h>
 #include <Psapi.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <tchar.h>
+
+// Alternative to ULARGE_INTEGER, this will give a proper FILETIME type
+union FILETIME64 {
+    FILETIME legacy;
+    uint64_t time;
+};
 
 namespace {
 // Displays usage help for this program.
@@ -11,19 +18,9 @@ void usage() {
     _tprintf(_T("Usage: TimeMem command [args...]\n"));
 }
 
-// Converts FILETIME to ULONGLONG.
-ULONGLONG ConvertFileTime(const FILETIME* t) {
-    ULARGE_INTEGER i;
-    CopyMemory(&i, t, sizeof(ULARGE_INTEGER));
-    return i.QuadPart;
-}
-
 // Displays information about a process.
 int info(HANDLE hProcess) {
     DWORD dwExitCode;
-    FILETIME ftCreation, ftExit, ftKernel, ftUser;
-    double tElapsed, tKernel, tUser;
-    PROCESS_MEMORY_COUNTERS pmc = { sizeof(PROCESS_MEMORY_COUNTERS) };
 
     // Exit code
     if (!GetExitCodeProcess(hProcess, &dwExitCode)) {
@@ -31,15 +28,20 @@ int info(HANDLE hProcess) {
     }
 
     // CPU info
-    if (!GetProcessTimes(hProcess, &ftCreation, &ftExit, &ftKernel, &ftUser)) {
+    FILETIME64 ftCreation;
+    FILETIME64 ftExit;
+    FILETIME64 ftKernel;
+    FILETIME64 ftUser;
+    if (!GetProcessTimes(hProcess, &ftCreation.legacy, &ftExit.legacy, &ftKernel.legacy, &ftUser.legacy)) {
         return 1;
     }
-    tElapsed = 1.0e-7 * (ConvertFileTime(&ftExit) - ConvertFileTime(&ftCreation));
-    tKernel = 1.0e-7 * ConvertFileTime(&ftKernel);
-    tUser = 1.0e-7 * ConvertFileTime(&ftUser);
+    double const tElapsed = 1.0e-7 * (ftExit.time - ftCreation.time);
+    double const tKernel = 1.0e-7 * ftKernel.time;
+    double const tUser = 1.0e-7 * ftUser.time;
 
     // Memory info
     // Print information about the memory usage of the process.
+    PROCESS_MEMORY_COUNTERS pmc = { sizeof(PROCESS_MEMORY_COUNTERS) };
     if (!GetProcessMemoryInfo(hProcess, &pmc, sizeof(pmc))) {
         return 1;
     }
