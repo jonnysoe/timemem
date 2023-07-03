@@ -331,3 +331,7 @@ ASALocalRun/
 
 # CMake build tree
 build/
+
+# Visual Studio Solution and Project files (can always regenerate from CMake without maintenance)
+*.sln
+*.vcxproj*
