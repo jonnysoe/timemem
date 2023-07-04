@@ -45,6 +45,22 @@ std::vector<auto_string> where(_TCHAR* command) {
     return target;
 }
 
+// Make the params pointer relative to full command line without needing to reconstruct arguments.
+// GetCommandLine() is typically the source for full command line.
+_TCHAR* partial_command(_TCHAR* const full_command, const std::vector<_TCHAR*>& args, int const offset) {
+    _TCHAR* params = _T("");
+    if (args.size() > offset) {
+        // Normally argv with spaces does not have quote `"` but full command line does,
+        // so -1 was blindly used to account for it.
+        params = _tcsstr(full_command, args[offset]) - 1;
+        if (*params != _T('\"')) {
+            // This argv does not have have space so `"` wasn't inserted, bump the starting pointer.
+            ++params;
+        }
+    }
+    return params;
+}
+
 // Displays information about a process.
 int info(HANDLE hProcess) {
     DWORD dwExitCode;
@@ -97,10 +113,9 @@ int info(HANDLE hProcess) {
 // - display detailed error message
 
 int _tmain(int argc, _TCHAR* argv[]) {
-#ifdef _DEBUG
     // Can add this in the debugger watchpoint.
+    // argv[0] is always the current program so skip it.
     std::vector<_TCHAR*> args(argv + 1, argv + argc);
-#endif
 
     // If we have no arguments, display usage info and exit.
     if (argc == 1)
@@ -110,21 +125,13 @@ int _tmain(int argc, _TCHAR* argv[]) {
     }
 
     // Acquire a normalized target command.
-    auto command = where(argv[1]);
+    auto command = where(args[0]);
 
-    // Get first command argument, skip the following arguments:
-    // - 0 is always the current program so skip it.
-    // - 1 is the target command which will be handled by the where function.
-    _TCHAR* params = _T("");
-    if (argc > 2) {
-        // Make the params pointer relative to GetCommandLine() without needing to reconstruct arguments.
-        // NOTE: argv does not have quote `"` but GetCommandLine() does, -1 blindly used to account for it.
-        params = _tcsstr(GetCommandLine(), argv[2]) - 1;
-        if (*params != _T('\"')) {
-            // argv does not have have space so `"` wasn't inserted, bump the starting pointer.
-            ++params;
-        }
-    }
+    // Get full command line.
+    _TCHAR* const full_command = partial_command(GetCommandLine(), args, 0);
+
+    // Get first command argument.
+    _TCHAR* const params = partial_command(full_command, args, 1);
 
     // Append the arguments.
     command[1] += params;
