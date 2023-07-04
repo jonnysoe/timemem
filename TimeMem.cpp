@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 #include <Psapi.h>
+#include <processenv.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <tchar.h>
@@ -22,6 +23,26 @@ namespace {
 // Displays usage help for this program.
 void usage() {
     _tprintf(_T("Usage: TimeMem command [args...]\n"));
+}
+
+// A makeshift where command that only returns the first instance of the command
+// NOTE: the string objects in the vector are corrupted, do not use size(), empty(), etc.
+std::vector<auto_string> where(_TCHAR* command) {
+    std::vector<auto_string> target(2);
+    target[0].reserve(MAX_PATH);
+    target[1].reserve(MAX_PATH);
+
+    // Attempt to search for fully qualified file path.
+    SearchPath(nullptr, command, _T(".exe"), MAX_PATH, target[0].data(), nullptr);
+
+    int err = GetLastError();
+    if (err == ENOENT) {
+        // Reattempt with cmd.
+        ///@todo: Need to account for PowerShell parent process.
+        SearchPath(nullptr, _T("cmd.exe"), nullptr, MAX_PATH, target[0].data(), nullptr);
+        target[1] = _T("/c ") + auto_string(command) + _T(" ");
+    }
+    return target;
 }
 
 // Displays information about a process.
@@ -53,6 +74,7 @@ int info(HANDLE hProcess) {
     }
 
     // Display info.
+    _tprintf(_T("\n"));
     _tprintf(_T("Exit code      : %u\n"), dwExitCode);
 
     _tprintf(_T("Elapsed time   : %.2lf\n"), tElapsed);
@@ -75,8 +97,10 @@ int info(HANDLE hProcess) {
 // - display detailed error message
 
 int _tmain(int argc, _TCHAR* argv[]) {
-    STARTUPINFO si = { sizeof(STARTUPINFO) };
-    PROCESS_INFORMATION pi;
+#ifdef _DEBUG
+    // Can add this in the debugger watchpoint.
+    std::vector<_TCHAR*> args(argv + 1, argv + argc);
+#endif
 
     // If we have no arguments, display usage info and exit.
     if (argc == 1)
@@ -85,17 +109,30 @@ int _tmain(int argc, _TCHAR* argv[]) {
         return EPERM;
     }
 
-    // Read the command line.
-    auto szCmdLine = GetCommandLine();
+    // Acquire a normalized target command.
+    auto command = where(argv[1]);
 
-    // Get first argument, argument 0 is always the current program so skip it.
-    auto szBegin = _tcsstr(szCmdLine, argv[1]);
-    if (*(szBegin - 1) == _T('\"')) {
-        --szBegin;
+    // Get first command argument, skip the following arguments:
+    // - 0 is always the current program so skip it.
+    // - 1 is the target command which will be handled by the where function.
+    _TCHAR* params = _T("");
+    if (argc > 2) {
+        // Make the params pointer relative to GetCommandLine() without needing to reconstruct arguments.
+        // NOTE: argv does not have quote `"` but GetCommandLine() does, -1 blindly used to account for it.
+        params = _tcsstr(GetCommandLine(), argv[2]) - 1;
+        if (*params != _T('\"')) {
+            // argv does not have have space so `"` wasn't inserted, bump the starting pointer.
+            ++params;
+        }
     }
 
+    // Append the arguments.
+    command[1] += params;
+
     // Create the process.
-    if (!CreateProcess(NULL, szBegin, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+    STARTUPINFO si = { sizeof(STARTUPINFO) };
+    PROCESS_INFORMATION pi;
+    if (!CreateProcess(command[0].data(), command[1].data(), nullptr, nullptr, false, 0, nullptr, nullptr, &si, &pi))
     {
         _tprintf(_T("Error: Cannot create process.\n"));
         return 1;
