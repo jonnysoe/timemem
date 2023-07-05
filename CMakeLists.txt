@@ -13,7 +13,7 @@ set_source_files_properties(${C_SOURCE_FILES} PROPERTIES LANGUAGE CXX)
 # Use static runtime library so that it will also work on PC without Visual C++ Redistributable
 string(REPLACE "/MD" "/MT" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 
-add_compile_definitions(_UNICODE UNICODE)
+add_compile_definitions(_UNICODE UNICODE _CRT_SECURE_NO_WARNINGS)
 
 # Using icon.bat cannot propagate failure to stop CMake...
 # add_custom_target(icon_generator
