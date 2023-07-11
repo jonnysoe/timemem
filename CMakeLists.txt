@@ -1,10 +1,23 @@
 cmake_minimum_required(VERSION 3.11)
+
+# Policy needs to be set before certain CMake features are used
+cmake_policy(SET CMP0091 NEW)   # CMAKE_MSVC_RUNTIME_LIBRARY
+
+# CMake features that configures other CMake variables need to be set before project
+# Use static runtime library so that it will also work on PC without Visual C++ Redistributable
+# https://learn.microsoft.com/en-us/cpp/c-runtime-library/crt-library-features?view=msvc-170
+# Equivalent to adding:
+# - Release: MultiThreaded /MT (-D_MT --dependent-lib=libcmt)
+# - Debug: /MDd (-D_DLL -D_MT --dependent-lib=msvcrtd)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:DebugDLL>")
+
+# ======================================================================
 project(TimeMem)
 
 # Enable c++17
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF) #No compiler specific extensions
+set(CMAKE_CXX_EXTENSIONS OFF)   # No compiler specific extensions
 
 # A bit unnecessary but will be useful if new files were accidentally added as *.c
 file(GLOB_RECURSE C_SOURCE_FILES "*.c")
@@ -14,19 +27,12 @@ message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 message(STATUS "CMAKE_CXX_COMPILER_FRONTEND_VARIANT: ${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}")
 
 if(NOT CMAKE_SYSTEM_NAME MATCHES Windows)
-    message(STATUS "This is an emulation of GNU Time for Windows!")
+    message(FATAL_ERROR "This is an emulation of GNU Time for Windows! (CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME})")
 endif()
 
-if(MSVC)
-    # Use static runtime library so that it will also work on PC without Visual C++ Redistributable
-    string(REPLACE "/MD" "/MT" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-else()
+if(NOT MSVC)
     # Clang CMAKE_CXX_COMPILER_FRONTEND_VARIANT is GNU
     add_compile_options(-Wno-writable-strings)
-
-    # Use static runtime library so that it will also work on PC without Visual C++ Redistributable
-    string(REPLACE "-D_DLL" " " CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
-    string(REPLACE "--dependent-lib=msvcrt" "--dependent-lib=libcmt" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 endif()
 
 add_compile_definitions(_UNICODE UNICODE)
