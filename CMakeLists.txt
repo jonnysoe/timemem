@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.11)
-project(timemem)
+project(TimeMem)
 
 # Enable c++17
 set(CMAKE_CXX_STANDARD 17)
@@ -10,8 +10,24 @@ set(CMAKE_CXX_EXTENSIONS OFF) #No compiler specific extensions
 file(GLOB_RECURSE C_SOURCE_FILES "*.c")
 set_source_files_properties(${C_SOURCE_FILES} PROPERTIES LANGUAGE CXX)
 
-# Use static runtime library so that it will also work on PC without Visual C++ Redistributable
-string(REPLACE "/MD" "/MT" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
+message(STATUS "CMAKE_CXX_COMPILER_FRONTEND_VARIANT: ${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}")
+
+if(NOT CMAKE_SYSTEM_NAME MATCHES Windows)
+    message(STATUS "This is an emulation of GNU Time for Windows!")
+endif()
+
+if(MSVC)
+    # Use static runtime library so that it will also work on PC without Visual C++ Redistributable
+    string(REPLACE "/MD" "/MT" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+else()
+    # Clang CMAKE_CXX_COMPILER_FRONTEND_VARIANT is GNU
+    add_compile_options(-Wno-writable-strings)
+
+    # Use static runtime library so that it will also work on PC without Visual C++ Redistributable
+    string(REPLACE "-D_DLL" " " CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+    string(REPLACE "--dependent-lib=msvcrt" "--dependent-lib=libcmt" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+endif()
 
 add_compile_definitions(_UNICODE UNICODE)
 
@@ -26,8 +42,8 @@ add_custom_target(icon_generator
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
 
-add_executable(timemem
+add_executable(${CMAKE_PROJECT_NAME}
     TimeMem.cpp
     resource.rc # https://www.reddit.com/r/cmake/comments/aqbg0f/comment/egf2p9r
 )
-add_dependencies(timemem icon_generator)
+add_dependencies(${CMAKE_PROJECT_NAME} icon_generator)
