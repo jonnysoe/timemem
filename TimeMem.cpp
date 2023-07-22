@@ -47,10 +47,14 @@ std::vector<auto_string> where(_TCHAR* command) {
     return target;
 }
 
-// Make the params pointer relative to full command line without needing to reconstruct arguments.
-// GetCommandLine() is typically the source for full command line.
+// Strips 1st command from full command.
+// Usage: make the params pointer relative to full command line without needing to reconstruct arguments.
+// Note: GetCommandLine() is typically the source for full command line.
 _TCHAR* strip_command(_TCHAR* const full_command) {
-    return _tcsstr(full_command, _T(" ")) + 1;
+    // If full command starts with quote, look for the closing quote as there will be space(s) within the command.
+    return (*full_command == _T('\"')) ?
+        _tcsstr(full_command + 1, _T("\"")) + 2 :   // '" abc def', '"   abc    def', etc.
+        _tcsstr(full_command, _T(" ")) + 1;         // ' abc def', '   abc    def', etc.
 }
 
 // Displays information about a process.
